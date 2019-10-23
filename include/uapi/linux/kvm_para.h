@@ -10,6 +10,10 @@
  * - kvm_para_available
  */
 
+
+/* Constant for CMPE283 assignment */
+#define KVM_HC_CMPE283 0x283
+
 /* Return values for hypercalls */
 #define KVM_ENOSYS		1000
 #define KVM_EFAULT		EFAULT
