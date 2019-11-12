@@ -23,6 +23,13 @@
 #include "mmu.h"
 #include "trace.h"
 #include "pmu.h"
+#include <stdatomic.h>
+
+//declare and define total exit counter
+atomic_ullong  total_exit_counter_for_cmpe283=0;
+
+//declare and defin total cycle counter
+atomic_ullong total_exit_cycles_for_cmpe283=0;
 
 static u32 xstate_required_size(u64 xstate_bv, bool compacted)
 {
@@ -1028,11 +1035,27 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 
 	eax = kvm_rax_read(vcpu);
 	ecx = kvm_rcx_read(vcpu);
-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
-	kvm_rax_write(vcpu, eax);
-	kvm_rbx_write(vcpu, ebx);
-	kvm_rcx_write(vcpu, ecx);
-	kvm_rdx_write(vcpu, edx);
+
+	switch(eax){
+		//return total exit counter to eax
+		case 0x4fffffff :
+					kvm_rax_write(vcpu, total_exit_counter_for_cmpe283);
+					break;
+		//return low 32 bits of total cycle count to ecx and high 32 bits to ebx		
+		case 0x4ffffffe :
+					kvm_rcx_write(vcpu, total_exit_cycles_for_cmpe283);
+					kvm_rbx_write(vcpu, total_exit_cycles_for_cmpe283 >> 32);
+					break;
+		default:                
+					kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+					kvm_rax_write(vcpu, eax);
+					kvm_rbx_write(vcpu, ebx);
+					kvm_rcx_write(vcpu, ecx);
+					kvm_rdx_write(vcpu, edx);
+					break;
+
+	}
 	return kvm_skip_emulated_instruction(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
+
