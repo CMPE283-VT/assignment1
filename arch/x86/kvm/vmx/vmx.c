@@ -60,9 +60,16 @@
 #include "vmcs12.h"
 #include "vmx.h"
 #include "x86.h"
+#include <stdatomic.h>
 
 MODULE_AUTHOR("Qumranet");
 MODULE_LICENSE("GPL");
+
+//declare total exit counter
+extern atomic_ullong total_exit_counter_for_cmpe283;
+
+//declare total cycle counter
+extern atomic_ullong total_exit_cycles_for_cmpe283;
 
 static const struct x86_cpu_id vmx_cpu_id[] = {
 	X86_FEATURE_MATCH(X86_FEATURE_VMX),
@@ -5850,16 +5857,58 @@ void dump_vmcs(void)
 }
 
 /*
+ * To get current cycle count from processor using RDTSC instruction
+ */
+
+static long long int get_current_cycle(void) {
+    unsigned long long int current_cycle;
+    unsigned int h, l;
+    __asm__ __volatile__("rdtsc" : "=a" (l), "=d" (h));
+    current_cycle = ((unsigned long long)l) | (((unsigned long long)h) << 32);
+    return current_cycle;
+}
+
+/*
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
  */
 static int vmx_handle_exit(struct kvm_vcpu *vcpu)
-{
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	u32 exit_reason = vmx->exit_reason;
-	u32 vectoring_info = vmx->idt_vectoring_info;
+{	
+
+	//declartion for storing cycle count at the start of exit
+	unsigned long long start_cycle;
+
+	//declartion for storing cycle count at the end of exit
+	unsigned long long end_cycle;
+
+	//moved declaration upwards to avoid warning: ISO C90 forbids mixed declarations
+	struct vcpu_vmx *vmx;
+	u32 exit_reason;
+	u32 vectoring_info;
+
+	//get current cycle count i.e. at the start of exit
+	start_cycle = get_current_cycle();	
+
+	//For debugging purpose
+	pr_err("Start cycle: %llu", start_cycle);
+
+	vmx = to_vmx(vcpu);
+	exit_reason = vmx->exit_reason;
+	vectoring_info = vmx->idt_vectoring_info;
 
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
+
+	//get current cycle count i.e. at the end of exit
+	end_cycle = get_current_cycle();	
+	pr_err("End cycle: %llu", end_cycle);
+
+	//increament exit counter
+	total_exit_counter_for_cmpe283++;
+	
+	//count cycles spent in this exit and increment total counter
+	total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
+	pr_err("Total cycles: %llu", total_exit_cycles_for_cmpe283);
+
 
 	/*
 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
