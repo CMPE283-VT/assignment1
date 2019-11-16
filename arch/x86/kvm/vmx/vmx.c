@@ -5889,26 +5889,16 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	//get current cycle count i.e. at the start of exit
 	start_cycle = get_current_cycle();	
 
-	//For debugging purpose
-	pr_err("Start cycle: %llu", start_cycle);
-
 	vmx = to_vmx(vcpu);
 	exit_reason = vmx->exit_reason;
 	vectoring_info = vmx->idt_vectoring_info;
 
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
 
-	//get current cycle count i.e. at the end of exit
-	end_cycle = get_current_cycle();	
-	pr_err("End cycle: %llu", end_cycle);
 
 	//increament exit counter
 	total_exit_counter_for_cmpe283++;
 	
-	//count cycles spent in this exit and increment total counter
-	total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
-	pr_err("Total cycles: %llu", total_exit_cycles_for_cmpe283);
-
 
 	/*
 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
@@ -5921,17 +5911,27 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		vmx_flush_pml_buffer(vcpu);
 
 	/* If guest state is invalid, start emulating */
-	if (vmx->emulation_required)
+	if (vmx->emulation_required){
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);	
 		return handle_invalid_guest_state(vcpu);
 
-	if (is_guest_mode(vcpu) && nested_vmx_exit_reflected(vcpu, exit_reason))
+	}
+	if (is_guest_mode(vcpu) && nested_vmx_exit_reflected(vcpu, exit_reason)){
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return nested_vmx_reflect_vmexit(vcpu, exit_reason);
-
+	}
 	if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
 		dump_vmcs();
 		vcpu->run->exit_reason = KVM_EXIT_FAIL_ENTRY;
 		vcpu->run->fail_entry.hardware_entry_failure_reason
 			= exit_reason;
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return 0;
 	}
 
@@ -5940,6 +5940,9 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		vcpu->run->exit_reason = KVM_EXIT_FAIL_ENTRY;
 		vcpu->run->fail_entry.hardware_entry_failure_reason
 			= vmcs_read32(VM_INSTRUCTION_ERROR);
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return 0;
 	}
 
@@ -5966,6 +5969,9 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 			vcpu->run->internal.data[3] =
 				vmcs_read64(GUEST_PHYSICAL_ADDRESS);
 		}
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return 0;
 	}
 
@@ -5989,9 +5995,13 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 	}
 
 	if (exit_reason < kvm_vmx_max_exit_handlers
-	    && kvm_vmx_exit_handlers[exit_reason])
+	    && kvm_vmx_exit_handlers[exit_reason]){
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return kvm_vmx_exit_handlers[exit_reason](vcpu);
-	else {
+	
+	}else {
 		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
 				exit_reason);
 		dump_vmcs();
@@ -6000,6 +6010,10 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 			KVM_INTERNAL_ERROR_UNEXPECTED_EXIT_REASON;
 		vcpu->run->internal.ndata = 1;
 		vcpu->run->internal.data[0] = exit_reason;
+
+		//get current cycle count i.e. at the end of exit
+		end_cycle = get_current_cycle();	
+		total_exit_cycles_for_cmpe283 += (end_cycle - start_cycle);
 		return 0;
 	}
 }
