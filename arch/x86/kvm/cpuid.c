@@ -31,6 +31,16 @@ atomic_ullong  total_exit_counter_for_cmpe283=0;
 //declare and defin total cycle counter
 atomic_ullong total_exit_cycles_for_cmpe283=0;
 
+
+//declare array for exit counts
+atomic_ullong total_exit_counter[100]; 
+
+//declare array for exit cycles 
+atomic_ullong total_exit_cycles[100]; 
+
+//function to check if exit is enabled in kvm
+extern bool is_exit_enabled(u32);
+
 static u32 xstate_required_size(u64 xstate_bv, bool compacted)
 {
 	int feature_bit = 0;
@@ -1046,6 +1056,49 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 					kvm_rcx_write(vcpu, total_exit_cycles_for_cmpe283);
 					kvm_rbx_write(vcpu, total_exit_cycles_for_cmpe283 >> 32);
 					break;
+		case 0x4ffffffd :	if(ecx==35 || ecx==38 || ecx==42 || ecx==65 || ecx > 68 || ecx < 0){
+						//exit number not in sdm
+						kvm_rax_write(vcpu, 0x0);				
+						kvm_rbx_write(vcpu, 0x0);				
+						kvm_rcx_write(vcpu, 0x0);				
+						kvm_rdx_write(vcpu, 0xffffffff);				
+					}						
+					else{
+						if(is_exit_enabled(ecx)){
+							//exit enabled in kvm
+							kvm_rax_write(vcpu, total_exit_counter[ecx]);
+						}else{
+							//exit not enabled in kvm
+							kvm_rax_write(vcpu, 0x0);				
+							kvm_rbx_write(vcpu, 0x0);				
+							kvm_rcx_write(vcpu, 0x0);				
+							kvm_rdx_write(vcpu, 0x0);				
+						}
+					}
+					break;
+		case 0x4ffffffc :	if(ecx==35 || ecx==38 || ecx==42 || ecx==65 || ecx > 68 || ecx < 0){
+						//exit number not in sdm
+						kvm_rax_write(vcpu, 0x0);				
+						kvm_rbx_write(vcpu, 0x0);				
+						kvm_rcx_write(vcpu, 0x0);				
+						kvm_rdx_write(vcpu, 0xffffffff);				
+					}						
+					else{
+						if(is_exit_enabled(ecx)){
+							//exit enabled in kvm
+							kvm_rcx_write(vcpu, total_exit_cycles[ecx]);
+							kvm_rbx_write(vcpu, total_exit_cycles[ecx] >> 32);
+						}
+						else{
+							//exit not enabled in kvm
+							kvm_rax_write(vcpu, 0x0);				
+							kvm_rbx_write(vcpu, 0x0);				
+							kvm_rcx_write(vcpu, 0x0);				
+							kvm_rdx_write(vcpu, 0x0);				
+						}
+					}
+					break;
+ 
 		default:                
 					kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 					kvm_rax_write(vcpu, eax);
@@ -1058,4 +1111,5 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 	return kvm_skip_emulated_instruction(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
+
 
